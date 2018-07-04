@@ -1,5 +1,16 @@
 spring:
-  profiles: local
+  profiles:
+    active: local
+  datasource:
+        driver-class-name: oracle.jdbc.OracleDriver
+        url: jdbc:oracle:thin:@devedu.hanboard.com.cn:11521:devbase
+        username: eduresource
+        password: eduresource
+      jpa:
+        hibernate:
+          ddl-auto: update
+        show-sql: true
+        database: oracle
 custom:
   token: training
   appId: wxfb6f5be2f2c10ef5
