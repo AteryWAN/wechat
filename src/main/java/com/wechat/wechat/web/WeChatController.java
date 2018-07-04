@@ -28,7 +28,7 @@ public class WeChatController {
      * @param response
      */
     @RequestMapping(value = "/entry")
-    public void weChatEntry(HttpServletRequest request, HttpServletResponse response) {
+    public void weChatEntry(HttpServletRequest request, HttpServletResponse response) throws Exception {
         weChatService.weChatEntry(request, response);
     }
 }

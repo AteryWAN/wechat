@@ -19,7 +19,6 @@ import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Writer;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -33,10 +32,60 @@ import java.util.Map;
  * @date: Created at 7/3 0003 15:11
  */
 public class MessageUtil {
+
+    /**
+     * 消息类型(MsgType):
+     event
+     text
+     image
+     voice
+     video
+     shortvideo
+     location
+     link
+     music
+     news
+     */
+
+    /**
+     * 消息类型：推送
+     */
+    public static final String MESSAGE_TYPE_EVENT = "event";
+
     /**
      * 消息类型：文本
      */
     public static final String MESSAGE_TYPE_TEXT = "text";
+
+    /**
+     * 消息类型：图片
+     */
+    public static final String MESSAGE_TYPE_IMAGE = "image";
+
+    /**
+     * 消息类型：音频
+     */
+    public static final String MESSAGE_TYPE_VOICE = "voice";
+
+    /**
+     * 消息类型：视频
+     */
+    public static final String MESSAGE_TYPE_VIDEO = "video";
+
+    /**
+     * 消息类型：小视频
+     */
+    public static final String MESSAGE_TYPE_SHORTVIDEO = "shortvideo";
+
+    /**
+     * 消息类型：地理位置
+     */
+    public static final String MESSAGE_TYPE_LOCATION = "location";
+
+    /**
+     * 消息类型：链接
+     */
+    public static final String MESSAGE_TYPE_LINK = "link";
 
     /**
      * 消息类型：音乐
@@ -49,30 +98,15 @@ public class MessageUtil {
     public static final String MESSAGE_TYPE_NEWS = "news";
 
 
-    /**
-     * 消息类型：图片
-     */
-    public static final String MESSAGE_TYPE_IMAGE = "image";
 
-    /**
-     * 消息类型：链接
+    /**  而消息类型(Event)下的事件类型：
+     subscribe(订阅)、
+     unsubscribe(取消订阅)
+     SCAN
+     LOCATION
+     CLICK
+     VIEW
      */
-    public static final String MESSAGE_TYPE_LINK = "link";
-
-    /**
-     * 消息类型：地理位置
-     */
-    public static final String MESSAGE_TYPE_LOCATION = "LOCATION";
-
-    /**
-     * 消息类型：音频
-     */
-    public static final String MESSAGE_TYPE_VOICE = "voice";
-
-    /**
-     * 消息类型：推送
-     */
-    public static final String MESSAGE_TYPE_EVENT = "event";
 
     /**
      * 事件类型：subscribe(订阅)
@@ -85,9 +119,28 @@ public class MessageUtil {
     public static final String EVENT_TYPE_UNSUBSCRIBE = "unsubscribe";
 
     /**
-     * 事件类型：CLICK(自己定义菜单点击事件)
+     * 事件类型：SCAN(扫描带参数二维码事件)
+     */
+    public static final String EVENT_TYPE_SCAN = "SCAN";
+
+    /**
+     * 事件类型：LOCATION(上报地理位置事件)
+     */
+    public static final String EVENT_TYPE_LOCATION = "LOCATION";
+
+    /**
+     * 事件类型：CLICK(点击菜单拉取消息时的事件推送)
      */
     public static final String EVENT_TYPE_CLICK = "CLICK";
+
+    /**
+     * 事件类型：VIEW(点击菜单跳转链接时的事件推送)
+     */
+    public static final String EVENT_TYPE_VIEW = "VIEW";
+
+
+
+
 
 
     /**

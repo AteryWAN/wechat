@@ -17,5 +17,5 @@ public interface WeChatService {
      * @param request
      * @param response
      */
-    void weChatEntry(HttpServletRequest request, HttpServletResponse response);
+    void weChatEntry(HttpServletRequest request, HttpServletResponse response) throws Exception;
 }
