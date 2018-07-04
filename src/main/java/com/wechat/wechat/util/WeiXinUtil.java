@@ -7,7 +7,9 @@ import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
 import org.springframework.beans.factory.annotation.Value;
 
@@ -48,7 +50,7 @@ public class WeiXinUtil {
         String url = Constants.GET_ACCESSTOKEN_URL.replace("APPID", APPID)
                 .replace("APPSECRET", SECRET);
         //  HttpClient模拟访问获取token数据
-        HttpClient httpClient = new DefaultHttpClient();
+        CloseableHttpClient httpClient = HttpClientBuilder.create().build();
         HttpGet httpGet = new HttpGet(url);
         HttpResponse response = httpClient.execute(httpGet);
         HttpEntity entity = response.getEntity();

@@ -3,9 +3,15 @@ package com.wechat.wechat.impl;
 import com.wechat.wechat.mapper.WeChatMapper;
 import com.wechat.wechat.module.AccessToken;
 import com.wechat.wechat.service.WeChatService;
+import com.wechat.wechat.util.Constants;
 import com.wechat.wechat.util.JsUtil;
 import com.wechat.wechat.util.MessageUtil;
 import com.wechat.wechat.util.WeiXinUtil;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.logging.log4j.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,8 +22,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.Date;
 import java.util.Map;
 import java.util.Objects;
@@ -51,12 +61,6 @@ public class WeChatServiceImpl implements WeChatService {
         //  区分接口配置/接口调用
         if (Objects.isNull(request.getParameter("openid"))) {
             //  openid为空,接口配置请求
-            /**
-             * signature, timestamp, nonce, echostr
-             * 1）将token、timestamp、nonce三个参数进行字典序排序
-             * 2）将三个参数字符串拼接成一个字符串进行sha1加密
-             * 3）开发者获得加密后的字符串可与signature对比，标识该请求来源于微信
-             */
             MessageUtil messageUtil = MessageUtil.getInstance();
             PrintWriter printWriter;
             try {
@@ -201,15 +205,24 @@ public class WeChatServiceImpl implements WeChatService {
     }
 
     /**
-     * location消息类型
+     * location消息类型(用户向公众号发送的地理位置)
+     * 区别于用户进入公众号时自动进行的地理位置上报操作(此操作属于event类型)
      *
      * @param requestMap
      * @param responseMsg
      * @return
      */
     private String locationMsg(Map<String, String> requestMap, String responseMsg) {
-
-        return null;
+        //  地理位置维度
+        String x = requestMap.get("Location_X");
+        //  地理位置经度
+        String y = requestMap.get("Location_Y");
+        //  地图缩放大小
+        String scale = requestMap.get("Scale");
+        //  地理位置信息
+        String label = requestMap.get("Label");
+        responseMsg = MessageUtil.initText(requestMap.get("fromUserName"), requestMap.get("toUserName"), label);
+        return responseMsg;
     }
 
     /**
@@ -219,7 +232,7 @@ public class WeChatServiceImpl implements WeChatService {
      */
     private String getToken() throws IOException {
         AccessToken accessToken;
-        //  获取当前数据库最新token对象,并进行有效期比对7
+        //  获取当前数据库最新token对象,并进行有效期比对
         accessToken = weChatMapper.getToken();
         if (Objects.nonNull(accessToken)) {
             Date nowDate = new Date();
@@ -234,6 +247,63 @@ public class WeChatServiceImpl implements WeChatService {
             weChatMapper.newToken(accessToken);
         }
         return accessToken.getAccessToken();
+    }
+
+
+    /**
+     * 根据经纬度获取地理位置
+     * HttpURLConnection
+     *
+     * @param X
+     * @param Y
+     * @return
+     */
+    private String addressInfo(String X, String Y) {
+        // latitude 纬度, longitude 经度, type 001 (100代表道路，010代表POI，001代表门址，111可以同时显示前三项)--001报错
+        String urlString = Constants.ADDRESS_URL.replace("LATITUDE", X).
+                replace("LONGITUDE", Y).replace("TYPE", "010");
+        String res = "";
+        try {
+            URL url = new URL(urlString);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setDoOutput(true);
+            conn.setRequestMethod("POST");
+            BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+            String line;
+            while ((line = in.readLine()) != null) {
+                res += line + "\n";
+            }
+            in.close();
+        } catch (Exception e) {
+            System.out.println("error is " + e.getMessage());
+        }
+        return res;
+    }
+
+    /**
+     * 根据经纬度获取地理位置
+     * httpClient
+     *
+     * @param longitude
+     * @param latitude
+     * @return
+     */
+    private String addressInfo2(String longitude, String latitude) throws IOException {
+        // latitude 纬度, longitude 经度, type 001 (100代表道路，010代表POI，001代表门址，111可以同时显示前三项)--001报错
+        String url = Constants.ADDRESS_URL.replace("LATITUDE", latitude).
+                replace("LONGITUDE", longitude).replace("TYPE", "010");
+        StringBuffer res = new StringBuffer();
+        CloseableHttpClient httpClient = HttpClientBuilder.create().build();
+        HttpGet httpGet = new HttpGet(url);
+        HttpResponse response = httpClient.execute(httpGet);
+        HttpEntity entity = response.getEntity();
+        //  读取数据
+        String line;
+        BufferedReader br = new BufferedReader(new InputStreamReader(entity.getContent()));
+        while ((line = br.readLine()) != null) {
+            res.append(line + "\n");
+        }
+        return res.toString();
     }
 
 
