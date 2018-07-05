@@ -1,7 +1,10 @@
 package com.wechat.wechat.impl;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.wechat.wechat.mapper.WeChatMapper;
 import com.wechat.wechat.module.AccessToken;
+import com.wechat.wechat.module.WeChatEntity;
 import com.wechat.wechat.module.menu.Button;
 import com.wechat.wechat.module.menu.ClickButton;
 import com.wechat.wechat.module.menu.Menu;
@@ -11,6 +14,8 @@ import com.wechat.wechat.util.Constants;
 import com.wechat.wechat.util.JsUtil;
 import com.wechat.wechat.util.MessageUtil;
 import com.wechat.wechat.util.WeiXinUtil;
+import net.glxn.qrgen.core.image.ImageType;
+import net.glxn.qrgen.javase.QRCode;
 import net.sf.json.JSONObject;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -20,6 +25,7 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.util.EntityUtils;
 import org.apache.logging.log4j.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,16 +37,20 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.ArrayList;
+import java.sql.Timestamp;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * @title: wechat-service
@@ -158,6 +168,7 @@ public class WeChatServiceImpl implements WeChatService {
         if (Strings.isNotEmpty(responseMsg)) {
             printWriter.write(responseMsg);
         }
+        //  关闭
         printWriter.flush();
         printWriter.close();
 
@@ -173,15 +184,15 @@ public class WeChatServiceImpl implements WeChatService {
      */
     private String eventMsg(Map<String, String> requestMap, String responseMsg) {
         //  提取公共数据
-        // 发送方帐号（open_id）
+        //  发送方帐号（open_id）
         String fromUserName = requestMap.get("FromUserName");
-        // 公众帐号
+        //  公众帐号
         String toUserName = requestMap.get("ToUserName");
-        // 消息类型
+        //  消息类型
         String msgType = requestMap.get("MsgType");
-        // 事件类型
+        //  事件类型
         String eventType = requestMap.get("Event");
-        // 消息创建时间
+        //  消息创建时间
         String createTime = requestMap.get("CreateTime");
 
         switch (eventType) {
@@ -190,7 +201,7 @@ public class WeChatServiceImpl implements WeChatService {
                 responseMsg = MessageUtil.initText(fromUserName, toUserName, "感谢您的关注!");
                 break;
             case MessageUtil.EVENT_TYPE_UNSUBSCRIBE:
-                System.out.println("用户" + fromUserName + "取消关注");
+                System.out.println("用户(" + fromUserName + ")取消关注");
                 break;
             case MessageUtil.EVENT_TYPE_SCAN:
                 System.out.println("扫码");
@@ -226,6 +237,7 @@ public class WeChatServiceImpl implements WeChatService {
     private String textMsg(Map<String, String> requestMap, String responseMsg) throws IOException {
         String content;
         if ("创建菜单".equals(requestMap.get("content"))) {
+            //  根据返回status判定请求成功/失败
             int status = createMenu(requestMap.get("token"));
             if (status == HttpStatus.SC_OK) {
                 content = "菜单创建成功!";
@@ -234,11 +246,26 @@ public class WeChatServiceImpl implements WeChatService {
                 content = "创建菜单失败!错误码: " + status;
                 System.out.println("创建菜单失败!错误码: " + status);
             }
-            responseMsg = MessageUtil.initText(requestMap.get("fromUserName"), requestMap.get("toUserName"), content);
+            responseMsg = MessageUtil.initText(requestMap.get("FromUserName"), requestMap.get("ToUserName"), content);
+        } else if ("查询菜单".equals(requestMap.get("content"))) {
+            //  转换数据为json格式并输出
+            JSONObject jsonObject = getMenuInfo(requestMap.get("token"));
+            content = jsonObject.toString();
+            responseMsg = MessageUtil.initText(requestMap.get("FromUserName"), requestMap.get("ToUserName"), content);
+        } else if ("删除菜单".equals(requestMap.get("content"))) {
+            int status = deleteMenu(requestMap.get("token"));
+            if (status == HttpStatus.SC_OK) {
+                content = "菜单删除成功!";
+                System.out.println("菜单删除建成功!");
+            } else {
+                content = "删除菜单失败!错误码: " + status;
+                System.out.println("删除菜单失败!错误码: " + status);
+            }
+            responseMsg = MessageUtil.initText(requestMap.get("FromUserName"), requestMap.get("ToUserName"), content);
         } else {
             content = "测试文字消息反馈";
             //  处理文字消息返回内容
-            responseMsg = MessageUtil.initText(requestMap.get("fromUserName"), requestMap.get("toUserName"), content);
+            responseMsg = MessageUtil.initText(requestMap.get("FromUserName"), requestMap.get("ToUserName"), content);
         }
 
         return responseMsg;
@@ -285,7 +312,7 @@ public class WeChatServiceImpl implements WeChatService {
         String scale = requestMap.get("Scale");
         //  地理位置信息
         String label = requestMap.get("Label");
-        responseMsg = MessageUtil.initText(requestMap.get("fromUserName"), requestMap.get("toUserName"), label);
+        responseMsg = MessageUtil.initText(requestMap.get("FromUserName"), requestMap.get("ToUserName"), label);
         return responseMsg;
     }
 
@@ -328,10 +355,12 @@ public class WeChatServiceImpl implements WeChatService {
                 replace("LONGITUDE", Y).replace("TYPE", "010");
         String res = "";
         try {
+            //  创建http请求连接
             URL url = new URL(urlString);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setDoOutput(true);
             conn.setRequestMethod("POST");
+            //  读取输入流信息
             BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
             String line;
             while ((line = in.readLine()) != null) {
@@ -370,20 +399,34 @@ public class WeChatServiceImpl implements WeChatService {
         return res.toString();
     }
 
-    public int createMenu(String token) throws IOException {
-        String url = Constants.MENU_URL.replace("ACCESS_TOKEN", token);
+    /**
+     * 创建自定义菜单
+     *
+     * @param token
+     * @return
+     * @throws IOException
+     */
+    private int createMenu(String token) throws IOException {
+        String url = Constants.CREATE_MENU_URL.replace("ACCESS_TOKEN", token);
         CloseableHttpClient httpClient = HttpClientBuilder.create().build();
         HttpPost httpPost = new HttpPost(url);
-        StringEntity entity = new StringEntity(menuJson().toString(), "UTF-8");
+        StringEntity entity = new StringEntity(initMenu().toString(), "UTF-8");
         httpPost.setEntity(entity);
         HttpResponse response = httpClient.execute(httpPost);
         int status = response.getStatusLine().getStatusCode();
         return status;
     }
 
-    public JSONObject menuJson() {
+    /**
+     * 初始化菜单数据
+     *
+     * @return
+     */
+    private JSONObject initMenu() {
+        //  创建菜单主体对象
         Menu menu = new Menu();
 
+        //  点击类型子菜单
         ClickButton clickButton11 = new ClickButton();
         clickButton11.setType("click");
         clickButton11.setName("click11");
@@ -394,6 +437,7 @@ public class WeChatServiceImpl implements WeChatService {
         clickButton12.setName("click12");
         clickButton12.setKey("key12");
 
+        //  链接类型子菜单
         ViewButton viewButton21 = new ViewButton();
         viewButton21.setType("view");
         viewButton21.setName("view21");
@@ -404,6 +448,7 @@ public class WeChatServiceImpl implements WeChatService {
         viewButton22.setName("view22");
         viewButton22.setUrl("https://cn.bing.com");
 
+        //  封装一级菜单数据
         Button button1 = new Button();
         button1.setName("btn1");
         button1.setSub_button(new Button[]{clickButton11, clickButton12});
@@ -412,11 +457,183 @@ public class WeChatServiceImpl implements WeChatService {
         button2.setName("btn2");
         button2.setSub_button(new Button[]{viewButton21, viewButton22});
 
+        //  封装菜单主体对象数据
         menu.setButton(new Button[]{button1, button2});
 
+        //  转为json格式返回
         JSONObject jsonObject = JSONObject.fromObject(menu);
         return jsonObject;
     }
 
+    /**
+     * 查询自定义菜单
+     *
+     * @param token
+     * @return
+     * @throws IOException
+     */
+    private JSONObject getMenuInfo(String token) throws IOException {
+        String url = Constants.GET_MENU_URL.replace("ACCESS_TOKEN", token);
+        CloseableHttpClient httpClient = HttpClientBuilder.create().build();
+        HttpGet httpGet = new HttpGet(url);
+        HttpResponse response = httpClient.execute(httpGet);
+        HttpEntity entity = response.getEntity();
+        JSONObject jsonObject = JSONObject.fromObject(entity);
+        return jsonObject;
+    }
 
+    /**
+     * 删除自定义菜单
+     *
+     * @param token
+     * @return
+     * @throws IOException
+     */
+    private int deleteMenu(String token) throws IOException {
+        String url = Constants.DELETE_MENU_URL.replace("ACCESS_TOKEN", token);
+        CloseableHttpClient httpClient = HttpClientBuilder.create().build();
+        HttpGet httpGet = new HttpGet(url);
+        HttpResponse response = httpClient.execute(httpGet);
+        int status = response.getStatusLine().getStatusCode();
+        return status;
+    }
+
+    /**
+     * 测试自动生成循环变量
+     *
+     * @param count
+     */
+    private void loopVariables(int count) {
+        Menu menu = new Menu();
+
+        Map<String, ClickButton> cb = new HashMap<>();
+        ClickButton clickButton;
+        for (int i = 0; i < count; i++) {
+            clickButton = new ClickButton();
+            clickButton.setType("click");
+            clickButton.setName("click1" + i);
+            clickButton.setKey("key1" + i);
+            cb.put("click1" + i, clickButton);
+        }
+
+        Map<String, ViewButton> vb = new HashMap<>();
+        ViewButton viewButton;
+        for (int i = 0; i < count; i++) {
+            viewButton = new ViewButton();
+            viewButton.setType("view");
+            viewButton.setName("view2" + i);
+            viewButton.setUrl("https://www.baidu.com");
+            vb.put("view2" + i, viewButton);
+        }
+
+        Map<String, Button> b = new HashMap<>();
+        Button button;
+        for (int i = 0; i < count; i++) {
+            button = new Button();
+            Button[] subButton;
+            for (int j = 0; j < count; j++) {
+                subButton = new Button[]{};
+                if (i == 0) {
+                    button.setName("btn" + i);
+                    subButton[j] = cb.get("click" + i + j);
+                }
+                if (i == 1) {
+                    button.setName("btn" + i);
+                    button.setSub_button(new Button[]{vb.get("click" + i + j)});
+                }
+                button.setSub_button(subButton);
+            }
+            b.put("button" + i, button);
+        }
+
+        for (int i = 0; i < count; i++) {
+            menu.setButton(new Button[]{b.get("button" + i)});
+        }
+    }
+
+    /**
+     * 获取用户基本信息
+     *
+     * @param requestMap
+     * @return
+     * @throws IOException
+     */
+    private WeChatEntity userInfo(Map<String, String> requestMap) throws IOException {
+        WeChatEntity weChatEntity = new WeChatEntity();
+        //  获取token,openId
+        String token = requestMap.get("token");
+        String openId = requestMap.get("FromUserName");
+        //  调用接口获取用户基本信息
+        String url = Constants.GET_USERINFO_URL.replace("ACCESSTOKEN", token).replace("OPENID", openId);
+        CloseableHttpClient httpClient = HttpClientBuilder.create().build();
+        HttpGet httpGet = new HttpGet(url);
+        HttpResponse response = httpClient.execute(httpGet);
+        HttpEntity entity = response.getEntity();
+        String jsonStr = EntityUtils.toString(entity, "UTF-8");
+        //  转为json格式
+        JsonParser jsonParser = new JsonParser();
+        JsonObject json = jsonParser.parse(jsonStr).getAsJsonObject();
+        //  封装WeChatEntity对象
+        if (Objects.nonNull(json)) {
+            weChatEntity.setId(UUID.randomUUID().toString());
+            weChatEntity.setSubscribe(json.get("subscribe").getAsInt());
+            weChatEntity.setOpenid(json.get("openid").getAsString());
+            weChatEntity.setNickname(json.get("nickname").getAsString());
+            weChatEntity.setSex(json.get("sex").getAsInt());
+            weChatEntity.setLanguage(json.get("language").getAsString());
+            weChatEntity.setCity(json.get("city").getAsString());
+            weChatEntity.setProvince(json.get("province").getAsString());
+            weChatEntity.setCountry(json.get("country").getAsString());
+            weChatEntity.setHeadimgurl(json.get("headimgurl").getAsString());
+            weChatEntity.setSubscribe_time(new Timestamp(json.get("subscribe_time").getAsLong()));
+            weChatEntity.setRemark(json.get("remark").getAsString());
+            weChatEntity.setGroupid(json.get("groupid").getAsInt());
+            weChatEntity.setTagid_list((List<Integer>) json.get("tagid_list"));
+        } else {
+            System.out.println("获取用户信息失败!");
+        }
+        return weChatEntity;
+    }
+
+    /**
+     * 生成场景值二维码
+     *
+     * @param codeInfo
+     * @param response
+     * @throws IOException
+     */
+    @Override
+    public void createQrCode(String codeInfo, HttpServletResponse response) throws IOException {
+        //  调用临时二维码生成接口
+        String token = getToken();
+        String codeUrl = Constants.GET_QRCODE_URL.replace("TOKEN", token);
+        CloseableHttpClient httpClient = HttpClientBuilder.create().build();
+        HttpPost httpPost = new HttpPost(codeUrl);
+        //  处理post请求参数
+        String codeParams = Constants.CODE_PARAMS_STR.replace("EXPIRE_SECONDS", "604800").replace("SCENE_STR", codeInfo);
+        StringEntity params = new StringEntity(new String(codeParams), "UTF-8");
+        httpPost.setEntity(params);
+        HttpResponse res = httpClient.execute(httpPost);
+        HttpEntity entity = res.getEntity();
+        //  解析返回的json数据
+        JsonParser jsonParser = new JsonParser();
+        String jsonStr = EntityUtils.toString(entity, "UTF-8");
+        JsonObject ticketJson = jsonParser.parse(jsonStr).getAsJsonObject();
+        String ticket;
+        String url = null;
+        //  通过ticket换取二维码(https://mp.weixin.qq.com/cgi-bin/showqrcode?ticket=TICKET)
+        if (Objects.nonNull(ticketJson)) {
+            ticket = ticketJson.get("ticket").getAsString();
+            url = ticketJson.get("url").getAsString();
+        }
+        //  利用qrcode库生成二维码(使用url)
+        //  设置字节数组输出流的格式,大小等
+        ByteArrayOutputStream out = QRCode.from(url).to(ImageType.PNG).withSize(350, 350).stream();
+        response.setContentType("image/png");
+        response.setContentLength(out.size());
+        OutputStream outStream = response.getOutputStream();
+        outStream.write(out.toByteArray());
+        outStream.flush();
+        outStream.close();
+    }
 }

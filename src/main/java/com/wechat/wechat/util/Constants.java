@@ -28,7 +28,7 @@ public class Constants {
      * 微信获取用户信息
      */
     public static String GET_USERINFO_URL =
-            "https://api.weixin.qq.com/cgi-bin/user/info?access_token=ACCESSTOKEN&openid=OPENID";
+            "https://api.weixin.qq.com/cgi-bin/user/info?access_token=ACCESS_TOKEN&openid=OPENID&lang=zh_CN";
 
     /**
      * 微信获取ticket
@@ -46,7 +46,7 @@ public class Constants {
      * 创建临时二维码ticket
      */
     public static String GET_QRCODE_URL =
-            "https://api.weixin.qq.com/cgi-bin/qrcode/create?access_token=ACCESSTOKEN";
+            "https://api.weixin.qq.com/cgi-bin/qrcode/create?access_token=TOKEN";
 
     /**
      * 打印公众号二维码
@@ -58,7 +58,7 @@ public class Constants {
     /**
      * 二维码参数json
      */
-    public static String TICKET_TO_JSON =
+    public static String CODE_PARAMS_STR =
             "{\"expire_seconds\": EXPIRE_SECONDS, \"action_name\": \"QR_STR_SCENE\", \"action_info\": {\"scene\": {\"scene_str\": \"SCENE_STR\"}}}";
 
     /**
@@ -95,6 +95,16 @@ public class Constants {
     /**
      * 自定义菜单
      */
-    public static String MENU_URL = "https://api.weixin.qq.com/cgi-bin/menu/create?access_token=ACCESS_TOKEN";
+    public static String CREATE_MENU_URL = "https://api.weixin.qq.com/cgi-bin/menu/create?access_token=ACCESS_TOKEN";
+
+    /**
+     * 查询菜单
+     */
+    public static String GET_MENU_URL = "https://api.weixin.qq.com/cgi-bin/menu/get?access_token=ACCESS_TOKEN";
+
+    /**
+     * 删除菜单
+     */
+    public static String DELETE_MENU_URL = "https://api.weixin.qq.com/cgi-bin/menu/delete?access_token=ACCESS_TOKEN";
 
 }
