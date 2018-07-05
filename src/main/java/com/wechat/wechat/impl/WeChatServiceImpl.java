@@ -205,6 +205,8 @@ public class WeChatServiceImpl implements WeChatService {
                 break;
             case MessageUtil.EVENT_TYPE_SCAN:
                 System.out.println("扫码");
+                String content = "二维码参数: " + requestMap.get("EventKey");
+                responseMsg = MessageUtil.initText(fromUserName, toUserName, content);
                 break;
             case MessageUtil.EVENT_TYPE_LOCATION:
                 System.out.println("地理位置");
@@ -241,10 +243,10 @@ public class WeChatServiceImpl implements WeChatService {
             int status = createMenu(requestMap.get("token"));
             if (status == HttpStatus.SC_OK) {
                 content = "菜单创建成功!";
-                System.out.println("菜单创建成功!");
+                System.out.println(content);
             } else {
                 content = "创建菜单失败!错误码: " + status;
-                System.out.println("创建菜单失败!错误码: " + status);
+                System.out.println(content);
             }
             responseMsg = MessageUtil.initText(requestMap.get("FromUserName"), requestMap.get("ToUserName"), content);
         } else if ("查询菜单".equals(requestMap.get("content"))) {
@@ -256,10 +258,10 @@ public class WeChatServiceImpl implements WeChatService {
             int status = deleteMenu(requestMap.get("token"));
             if (status == HttpStatus.SC_OK) {
                 content = "菜单删除成功!";
-                System.out.println("菜单删除建成功!");
+                System.out.println(content);
             } else {
                 content = "删除菜单失败!错误码: " + status;
-                System.out.println("删除菜单失败!错误码: " + status);
+                System.out.println(content);
             }
             responseMsg = MessageUtil.initText(requestMap.get("FromUserName"), requestMap.get("ToUserName"), content);
         } else {
@@ -433,7 +435,7 @@ public class WeChatServiceImpl implements WeChatService {
         clickButton11.setKey("key11");
 
         ClickButton clickButton12 = new ClickButton();
-        clickButton12.setType("click12");
+        clickButton12.setType("click");
         clickButton12.setName("click12");
         clickButton12.setKey("key12");
 

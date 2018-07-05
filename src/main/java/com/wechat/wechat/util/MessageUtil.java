@@ -98,7 +98,6 @@ public class MessageUtil {
     public static final String MESSAGE_TYPE_NEWS = "news";
 
 
-
     /**  而消息类型(Event)下的事件类型：
      subscribe(订阅)、
      unsubscribe(取消订阅)
@@ -137,10 +136,6 @@ public class MessageUtil {
      * 事件类型：VIEW(点击菜单跳转链接时的事件推送)
      */
     public static final String EVENT_TYPE_VIEW = "VIEW";
-
-
-
-
 
 
     /**
