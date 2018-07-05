@@ -2,6 +2,21 @@
     "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.wechat.wechat.mapper.WeChatMapper">
 
+    <insert id="newToken" parameterType="com.wechat.wechat.module.AccessToken">
+        INSERT INTO token_backup(id, access_token, expires_in, create_time)
+        VALUES (#{id}, #{accessToken}, #{expiresIn}, #{createTime})
+    </insert>
+
+    <select id="getToken">
+        SELECT
+        id AS id,
+        access_token AS accessToken,
+        expires_in AS expiresIn,
+        create_time AS createTime
+        FROM token_backup
+        ORDER BY create_time DESC
+        limit 1
+    </select>
 
 
 </mapper>

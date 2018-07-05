@@ -2,14 +2,22 @@ package com.wechat.wechat.impl;
 
 import com.wechat.wechat.mapper.WeChatMapper;
 import com.wechat.wechat.module.AccessToken;
+import com.wechat.wechat.module.menu.Button;
+import com.wechat.wechat.module.menu.ClickButton;
+import com.wechat.wechat.module.menu.Menu;
+import com.wechat.wechat.module.menu.ViewButton;
 import com.wechat.wechat.service.WeChatService;
 import com.wechat.wechat.util.Constants;
 import com.wechat.wechat.util.JsUtil;
 import com.wechat.wechat.util.MessageUtil;
 import com.wechat.wechat.util.WeiXinUtil;
+import net.sf.json.JSONObject;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.logging.log4j.util.Strings;
@@ -28,7 +36,9 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -162,8 +172,48 @@ public class WeChatServiceImpl implements WeChatService {
      * @return
      */
     private String eventMsg(Map<String, String> requestMap, String responseMsg) {
+        //  提取公共数据
+        // 发送方帐号（open_id）
+        String fromUserName = requestMap.get("FromUserName");
+        // 公众帐号
+        String toUserName = requestMap.get("ToUserName");
+        // 消息类型
+        String msgType = requestMap.get("MsgType");
+        // 事件类型
+        String eventType = requestMap.get("Event");
+        // 消息创建时间
+        String createTime = requestMap.get("CreateTime");
 
-        return null;
+        switch (eventType) {
+            case MessageUtil.EVENT_TYPE_SUBSCRIBE:
+                System.out.println("关注");
+                responseMsg = MessageUtil.initText(fromUserName, toUserName, "感谢您的关注!");
+                break;
+            case MessageUtil.EVENT_TYPE_UNSUBSCRIBE:
+                System.out.println("用户" + fromUserName + "取消关注");
+                break;
+            case MessageUtil.EVENT_TYPE_SCAN:
+                System.out.println("扫码");
+                break;
+            case MessageUtil.EVENT_TYPE_LOCATION:
+                System.out.println("地理位置");
+                try {
+                    responseMsg = addressInfo2(requestMap.get("longtitue"), requestMap.get("latitude"));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                break;
+            case MessageUtil.EVENT_TYPE_CLICK:
+                System.out.println("点击事件");
+                break;
+            case MessageUtil.EVENT_TYPE_VIEW:
+                System.out.println("链接事件");
+                break;
+            default:
+                System.out.println("默认");
+                break;
+        }
+        return responseMsg;
     }
 
     /**
@@ -173,10 +223,24 @@ public class WeChatServiceImpl implements WeChatService {
      * @param responseMsg
      * @return
      */
-    private String textMsg(Map<String, String> requestMap, String responseMsg) {
-        String content = "测试文字消息反馈";
-        //  处理文字消息返回内容
-        responseMsg = MessageUtil.initText(requestMap.get("fromUserName"), requestMap.get("toUserName"), content);
+    private String textMsg(Map<String, String> requestMap, String responseMsg) throws IOException {
+        String content;
+        if ("创建菜单".equals(requestMap.get("content"))) {
+            int status = createMenu(requestMap.get("token"));
+            if (status == HttpStatus.SC_OK) {
+                content = "菜单创建成功!";
+                System.out.println("菜单创建成功!");
+            } else {
+                content = "创建菜单失败!错误码: " + status;
+                System.out.println("创建菜单失败!错误码: " + status);
+            }
+            responseMsg = MessageUtil.initText(requestMap.get("fromUserName"), requestMap.get("toUserName"), content);
+        } else {
+            content = "测试文字消息反馈";
+            //  处理文字消息返回内容
+            responseMsg = MessageUtil.initText(requestMap.get("fromUserName"), requestMap.get("toUserName"), content);
+        }
+
         return responseMsg;
     }
 
@@ -304,6 +368,54 @@ public class WeChatServiceImpl implements WeChatService {
             res.append(line + "\n");
         }
         return res.toString();
+    }
+
+    public int createMenu(String token) throws IOException {
+        String url = Constants.MENU_URL.replace("ACCESS_TOKEN", token);
+        CloseableHttpClient httpClient = HttpClientBuilder.create().build();
+        HttpPost httpPost = new HttpPost(url);
+        StringEntity entity = new StringEntity(menuJson().toString(), "UTF-8");
+        httpPost.setEntity(entity);
+        HttpResponse response = httpClient.execute(httpPost);
+        int status = response.getStatusLine().getStatusCode();
+        return status;
+    }
+
+    public JSONObject menuJson() {
+        Menu menu = new Menu();
+
+        ClickButton clickButton11 = new ClickButton();
+        clickButton11.setType("click");
+        clickButton11.setName("click11");
+        clickButton11.setKey("key11");
+
+        ClickButton clickButton12 = new ClickButton();
+        clickButton12.setType("click12");
+        clickButton12.setName("click12");
+        clickButton12.setKey("key12");
+
+        ViewButton viewButton21 = new ViewButton();
+        viewButton21.setType("view");
+        viewButton21.setName("view21");
+        viewButton21.setUrl("https://www.baidu.com");
+
+        ViewButton viewButton22 = new ViewButton();
+        viewButton22.setType("view");
+        viewButton22.setName("view22");
+        viewButton22.setUrl("https://cn.bing.com");
+
+        Button button1 = new Button();
+        button1.setName("btn1");
+        button1.setSub_button(new Button[]{clickButton11, clickButton12});
+
+        Button button2 = new Button();
+        button2.setName("btn2");
+        button2.setSub_button(new Button[]{viewButton21, viewButton22});
+
+        menu.setButton(new Button[]{button1, button2});
+
+        JSONObject jsonObject = JSONObject.fromObject(menu);
+        return jsonObject;
     }
 
 

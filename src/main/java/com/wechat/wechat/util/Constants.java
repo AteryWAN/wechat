@@ -86,7 +86,15 @@ public class Constants {
             "https://api.weixin.qq.com/sns/oauth2/access_token?appid=APPID&secret=SECRET&code=CODE&grant_type=authorization_code";
 
 
+    /**
+     * 阿里地图获取地理位置
+     */
     public static String ADDRESS_URL =
             "http://gc.ditu.aliyun.com/regeocoding?l=LATITUDE,LONGITUDE&type=TYPE";
+
+    /**
+     * 自定义菜单
+     */
+    public static String MENU_URL = "https://api.weixin.qq.com/cgi-bin/menu/create?access_token=ACCESS_TOKEN";
 
 }
