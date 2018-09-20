@@ -10,6 +10,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.util.Date;
@@ -22,6 +23,7 @@ import java.util.UUID;
  * @desc: 微信 - 微信基础数据工具类
  * @date: Created at 7/4 0004 16:19
  */
+@Component
 public class WeiXinUtil {
 
     private static String APPID;
@@ -58,9 +60,9 @@ public class WeiXinUtil {
         JsonObject jsonObject = jsonParser.parse(resMsg).getAsJsonObject();
         if (Objects.nonNull(jsonObject)){
             accessToken = new AccessToken();
-            accessToken.setId(UUID.randomUUID().toString());
+            accessToken.setId(UUID.randomUUID().toString().replaceAll("-", ""));
             accessToken.setAccessToken(jsonObject.get("access_token").getAsString());
-            accessToken.setExpiresIn(jsonObject.get("expires_ine").getAsInt());
+            accessToken.setExpiresIn(jsonObject.get("expires_in").getAsInt());
             accessToken.setCreateTime(new Date());
         }
         return accessToken;

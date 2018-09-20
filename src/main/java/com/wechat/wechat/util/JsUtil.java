@@ -1,6 +1,8 @@
 package com.wechat.wechat.util;
 
 import org.apache.logging.log4j.util.Strings;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 import javax.servlet.http.HttpServletRequest;
 import java.security.MessageDigest;
@@ -13,9 +15,18 @@ import java.util.Arrays;
  * @desc: 微信 - 签名验证工具
  * @date: Created at 7/4 0004 14:29
  */
+@Component
 public class JsUtil {
 
-    private static String token = "token";
+    private static String token;
+
+    @Value("${custom.token}")
+    public void setToken(String token) {
+        JsUtil.token = token;
+    }
+
+
+
 
     /**
      * 签名

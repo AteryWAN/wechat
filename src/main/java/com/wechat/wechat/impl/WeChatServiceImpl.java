@@ -16,6 +16,7 @@ import com.wechat.wechat.util.MessageUtil;
 import com.wechat.wechat.util.WeiXinUtil;
 import net.glxn.qrgen.core.image.ImageType;
 import net.glxn.qrgen.javase.QRCode;
+import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -64,8 +65,11 @@ public class WeChatServiceImpl implements WeChatService {
 
     private static final Logger logger = LoggerFactory.getLogger(WeChatServiceImpl.class);
 
-    @Value("{custom.tokenTime}")
+    @Value("${custom.tokenTime}")
     private String tokenTime;
+
+    @Value("${custom.addFlag}")
+    private boolean addFlag;
 
     @Autowired
     private WeChatMapper weChatMapper;
@@ -81,11 +85,8 @@ public class WeChatServiceImpl implements WeChatService {
         //  区分接口配置/接口调用
         if (Objects.isNull(request.getParameter("openid"))) {
             //  openid为空,接口配置请求
-            MessageUtil messageUtil = MessageUtil.getInstance();
             PrintWriter printWriter;
             try {
-                //  将微信请求数据并转换为map集合
-                Map map = messageUtil.parseXml(request);
                 //  微信加密签名
                 String signature = request.getParameter("signature");
                 //  时间戳
@@ -145,25 +146,25 @@ public class WeChatServiceImpl implements WeChatService {
         // 消息创建时间
         String createTime = requestMap.get("CreateTime");
 
+        System.out.println("msgType: " + msgType);
         //  根据不同msgType进行不同响应
         //  有msgid的消息推荐使用msgid排重。事件类型消息推荐使用FromUserName + CreateTime 排重。
         if (MessageUtil.MESSAGE_TYPE_EVENT.equals(msgType)) {
             //  推送event消息类型
-            eventMsg(requestMap, responseMsg);
+            responseMsg = eventMsg(requestMap, responseMsg);
         } else if (MessageUtil.MESSAGE_TYPE_TEXT.equals(msgType)) {
             //  文字消息类型
-            textMsg(requestMap, responseMsg);
+            responseMsg = textMsg(requestMap, responseMsg);
         } else if (MessageUtil.MESSAGE_TYPE_IMAGE.equals(msgType)) {
             //  图片消息类型
-            imageMsg(requestMap, responseMsg);
+            responseMsg = imageMsg(requestMap, responseMsg);
         } else if (MessageUtil.MESSAGE_TYPE_VIDEO.equals(msgType)) {
             //  视频消息类型
-            videoMsg(requestMap, responseMsg);
+            responseMsg = videoMsg(requestMap, responseMsg);
         } else if (MessageUtil.MESSAGE_TYPE_LOCATION.equals(msgType)) {
             //  上报地理位置
-            locationMsg(requestMap, responseMsg);
+            responseMsg = locationMsg(requestMap, responseMsg);
         }
-
         //  输出响应消息内容反馈
         if (Strings.isNotEmpty(responseMsg)) {
             printWriter.write(responseMsg);
@@ -211,7 +212,10 @@ public class WeChatServiceImpl implements WeChatService {
             case MessageUtil.EVENT_TYPE_LOCATION:
                 System.out.println("地理位置");
                 try {
-                    responseMsg = addressInfo2(requestMap.get("longtitue"), requestMap.get("latitude"));
+                    String address = addressInfo2(requestMap.get("Longitude"), requestMap.get("Latitude"));
+                    if (addFlag) {
+                        responseMsg = MessageUtil.initText(fromUserName, toUserName, address);
+                    }
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -237,8 +241,10 @@ public class WeChatServiceImpl implements WeChatService {
      * @return
      */
     private String textMsg(Map<String, String> requestMap, String responseMsg) throws IOException {
+        String order = requestMap.get("Content");
         String content;
-        if ("创建菜单".equals(requestMap.get("content"))) {
+        if ("创建菜单".equals(order)) {
+            System.out.println(1);
             //  根据返回status判定请求成功/失败
             int status = createMenu(requestMap.get("token"));
             if (status == HttpStatus.SC_OK) {
@@ -249,12 +255,12 @@ public class WeChatServiceImpl implements WeChatService {
                 System.out.println(content);
             }
             responseMsg = MessageUtil.initText(requestMap.get("FromUserName"), requestMap.get("ToUserName"), content);
-        } else if ("查询菜单".equals(requestMap.get("content"))) {
+        } else if ("查询菜单".equals(order)) {
             //  转换数据为json格式并输出
             JSONObject jsonObject = getMenuInfo(requestMap.get("token"));
             content = jsonObject.toString();
             responseMsg = MessageUtil.initText(requestMap.get("FromUserName"), requestMap.get("ToUserName"), content);
-        } else if ("删除菜单".equals(requestMap.get("content"))) {
+        } else if ("删除菜单".equals(order)) {
             int status = deleteMenu(requestMap.get("token"));
             if (status == HttpStatus.SC_OK) {
                 content = "菜单删除成功!";
@@ -265,11 +271,10 @@ public class WeChatServiceImpl implements WeChatService {
             }
             responseMsg = MessageUtil.initText(requestMap.get("FromUserName"), requestMap.get("ToUserName"), content);
         } else {
-            content = "测试文字消息反馈";
+            content = "你说: " + order;
             //  处理文字消息返回内容
             responseMsg = MessageUtil.initText(requestMap.get("FromUserName"), requestMap.get("ToUserName"), content);
         }
-
         return responseMsg;
     }
 
@@ -313,7 +318,7 @@ public class WeChatServiceImpl implements WeChatService {
         //  地图缩放大小
         String scale = requestMap.get("Scale");
         //  地理位置信息
-        String label = requestMap.get("Label");
+        String label = "你上报的地理位置为: " + requestMap.get("Label");
         responseMsg = MessageUtil.initText(requestMap.get("FromUserName"), requestMap.get("ToUserName"), label);
         return responseMsg;
     }
@@ -330,13 +335,14 @@ public class WeChatServiceImpl implements WeChatService {
         if (Objects.nonNull(accessToken)) {
             Date nowDate = new Date();
             Date tokenDate = accessToken.getCreateTime();
-            if ((nowDate.getTime() - tokenDate.getTime()) > Integer.valueOf(tokenTime)) {
+            if ((nowDate.getTime() - tokenDate.getTime()) / 1000 > Integer.valueOf(tokenTime)) {
                 //  当前时间和token存储时间差值大于设定的标准值,则重新获取
                 accessToken = WeiXinUtil.getAccessToken();
                 weChatMapper.newToken(accessToken);
             }
         } else {
             accessToken = WeiXinUtil.getAccessToken();
+            System.out.println(accessToken.getAccessToken());
             weChatMapper.newToken(accessToken);
         }
         return accessToken.getAccessToken();
@@ -398,7 +404,13 @@ public class WeChatServiceImpl implements WeChatService {
         while ((line = br.readLine()) != null) {
             res.append(line + "\n");
         }
-        return res.toString();
+        JSONObject jsonObject = JSONObject.fromObject(res.toString());
+        JSONArray jsonArray = JSONArray.fromObject(jsonObject.getString("addrList"));
+        JSONObject addObject = JSONObject.fromObject(jsonArray.get(0));
+        String addOne = addObject.get("admName").toString();
+        String addTwo = addObject.get("addr").toString();
+        String address = "你当前所在位置为: " + addOne.replaceAll(",", "") + addTwo;
+        return address;
     }
 
     /**
@@ -442,12 +454,12 @@ public class WeChatServiceImpl implements WeChatService {
         //  链接类型子菜单
         ViewButton viewButton21 = new ViewButton();
         viewButton21.setType("view");
-        viewButton21.setName("view21");
+        viewButton21.setName("百度");
         viewButton21.setUrl("https://www.baidu.com");
 
         ViewButton viewButton22 = new ViewButton();
         viewButton22.setType("view");
-        viewButton22.setName("view22");
+        viewButton22.setName("bing");
         viewButton22.setUrl("https://cn.bing.com");
 
         //  封装一级菜单数据
@@ -456,7 +468,7 @@ public class WeChatServiceImpl implements WeChatService {
         button1.setSub_button(new Button[]{clickButton11, clickButton12});
 
         Button button2 = new Button();
-        button2.setName("btn2");
+        button2.setName("搜索工具");
         button2.setSub_button(new Button[]{viewButton21, viewButton22});
 
         //  封装菜单主体对象数据

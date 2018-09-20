@@ -7,7 +7,7 @@
         VALUES (#{id}, #{accessToken}, #{expiresIn}, #{createTime})
     </insert>
 
-    <select id="getToken">
+    <select id="getToken" resultType="com.wechat.wechat.module.AccessToken">
         SELECT
         id AS id,
         access_token AS accessToken,

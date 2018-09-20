@@ -6,3 +6,4 @@ custom:
   appId: wxfb6f5be2f2c10ef5
   secret: 16d8cd5d3f4ad13fb1f4bfd8d128c2b1
   tokenTime: 3600
+  addFlag: false
