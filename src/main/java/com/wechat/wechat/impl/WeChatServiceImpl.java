@@ -244,7 +244,6 @@ public class WeChatServiceImpl implements WeChatService {
         String order = requestMap.get("Content");
         String content;
         if ("创建菜单".equals(order)) {
-            System.out.println(1);
             //  根据返回status判定请求成功/失败
             int status = createMenu(requestMap.get("token"));
             if (status == HttpStatus.SC_OK) {
@@ -257,8 +256,8 @@ public class WeChatServiceImpl implements WeChatService {
             responseMsg = MessageUtil.initText(requestMap.get("FromUserName"), requestMap.get("ToUserName"), content);
         } else if ("查询菜单".equals(order)) {
             //  转换数据为json格式并输出
-            JSONObject jsonObject = getMenuInfo(requestMap.get("token"));
-            content = jsonObject.toString();
+//            JSONObject jsonObject = getMenuInfo(requestMap.get("token"));
+            content = getMenuInfo(requestMap.get("token"));
             responseMsg = MessageUtil.initText(requestMap.get("FromUserName"), requestMap.get("ToUserName"), content);
         } else if ("删除菜单".equals(order)) {
             int status = deleteMenu(requestMap.get("token"));
@@ -407,9 +406,9 @@ public class WeChatServiceImpl implements WeChatService {
         JSONObject jsonObject = JSONObject.fromObject(res.toString());
         JSONArray jsonArray = JSONArray.fromObject(jsonObject.getString("addrList"));
         JSONObject addObject = JSONObject.fromObject(jsonArray.get(0));
-        String addOne = addObject.get("admName").toString();
-        String addTwo = addObject.get("addr").toString();
-        String address = "你当前所在位置为: " + addOne.replaceAll(",", "") + addTwo;
+        String addrOne = addObject.get("admName").toString();
+        String addrTwo = addObject.get("addr").toString();
+        String address = "你当前所在位置为: " + addrOne.replaceAll(",", "") + addrTwo;
         return address;
     }
 
@@ -486,14 +485,15 @@ public class WeChatServiceImpl implements WeChatService {
      * @return
      * @throws IOException
      */
-    private JSONObject getMenuInfo(String token) throws IOException {
+    private String getMenuInfo(String token) throws IOException {
         String url = Constants.GET_MENU_URL.replace("ACCESS_TOKEN", token);
         CloseableHttpClient httpClient = HttpClientBuilder.create().build();
         HttpGet httpGet = new HttpGet(url);
         HttpResponse response = httpClient.execute(httpGet);
         HttpEntity entity = response.getEntity();
+        String jsonStr = EntityUtils.toString(entity, "UTF-8");
         JSONObject jsonObject = JSONObject.fromObject(entity);
-        return jsonObject;
+        return jsonStr;
     }
 
     /**
